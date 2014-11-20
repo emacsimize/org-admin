@@ -1,0 +1,138 @@
+* Org-Admin Modul
+This is my experimental coding project
+** Documentation - or so
+   file:/ssh:stallman|sudo:root@stallman:/jobs/voxtel_import/voxtel_import_starter.txt
+   
+   The above is the direct file link to a remote host and it will be access with root sudo rigth
+   
+   
+   The next are some small function as first attempt to connect directly to some remote directory
+   
+   #+BEGIN_SRC emacs-lisp tangle: no
+      (org-admin/new-eshell-cd-to "/kwok:")
+      (prepare-tramp-sudo-string "/kwok:")
+      (org-admin/new-eshell-sudo-cd-to "/kwok:/tmp")    
+   #+END_SRC
+   
+   
+   Of course sudo-cd-to files if this is a file. Bad thing is that I
+   get the error after the new shell is opened. Dunno how to get
+   arround this.
+** Functions
+*** org-admin/new-eshell-cd-to
+    Idea is to create a function that opens a new eshell buffer and 
+    "cd"s to a destination.
+    The destination I have in mind is a remote host (/directory) but it
+    most likely will work with local destinations to.
+
+    #+BEGIN_SRC emacs-lisp
+      (defun org-admin/new-eshell-cd-to ()
+        "Opens a new Eshell and cds to the destination.
+      It hasnt necessarily to be a remote host."
+        (interactive)
+        (if (org-admin/get-destination)
+            (progn
+              (eshell-new)
+              (eshell/cd (org-admin/get-destination))
+              ;; I call send input here for cosmetic reasons since the
+              ;; 'cd' happens in the background and the new eshell buffer
+              ;; isn't updated yet.p
+              (eshell-send-input))
+          (message "Org-admin: No suitable destination found")))
+    #+END_SRC
+
+*** org-admin/new-eshell-sudo-cd-to
+    Thats much the same as the other function but it calls my
+    'prepare-tramp-sudo-string'. This functions breaks if the
+    destination is a file. I have yet to see if this will be an issue.
+
+    #+BEGIN_SRC emacs-lisp
+      (defun org-admin/new-eshell-sudo-cd-to (dest)
+        "Opens a new Eshell and cds to the destination.
+      In this case it will consruct a tramp hop string befor 'cd'."
+        (interactive)
+        (eshell-new)
+        (eshell/cd (prepare-tramp-sudo-string dest))
+        ;; I call send input here for cosmetic reasons since the
+        ;; 'cd' happens in the background and the new eshell buffer
+        ;; isn't updated yet.
+        (eshell-send-input))    
+    #+END_SRC
+
+*** org-admin/find-hostname
+    This function will take care of finding the hostname to connect to.
+    It should look for a property setting (drawer) or a heading with admin TAG.
+    If none is found search next parent heading till 'root'.
+
+    The reason to only take tagged headings is to be able to do sub
+    heading sections that don't effect my hostname.
+
+    #+BEGIN_SRC emacs-lisp
+      (defun org-admin/find-hostname ()
+        (interactive)
+        ;; check local properties
+        (cond
+         ((org-admin/section-get-host-property)
+         ((org-admin/heading-has-host-tag-p) (nth 4 (org-heading-components))))
+        )
+
+      (defun org-admin/section-get-host-property ()
+        (org-entry-get nil "oa_host")
+        )
+
+      (defun org-admin/get-destination ()
+        (when (org-admin/find-hostname)
+          (concat "/" (org-admin/find-hostname) ":")
+          ))
+
+      ;; TODO the "host" needs to be configureable... defvar ?!
+      (defun org-admin/heading-has-host-tag-p ()
+        "Simple loop tru all of list members (tags) and return t if
+      found otherwise nil."
+        (catch 'found
+          (mapc
+           (lambda (x)
+             (message "%s" x)
+             (when (equal x "host") (throw 'found t)))
+           (org-get-local-tags))
+          nil)
+        )
+
+      (global-set-key (kbd "s-a c") 'org-admin/new-eshell-cd-to)
+      (global-set-key (kbd "s-a s c") 'org-admin/new-eshell-sudo-cd-to)
+    #+END_SRC
+
+
+
+** Tests
+*** Eshell Connection Tests
+**** kwok                                                    :Inventory:host:
+     :PROPERTIES:
+     :oa_host:  kwok
+     :END:
+
+     Plain heading connection test.
+
+     The section name (heading) is the name of the host. I would like to be able to
+     press a key within this section an open a eshell connection to
+     it.
+***** This subheading breaks it all     
+     :(
+
+
+
+* Sandbox
+     (org-admin/find-hostname)
+
+     (org-admin/get-destination)
+
+     org-get-local-tags
+     org-get-tags
+     org-scan-tags
+     (org-get-tags)
+     (org-get-local-tags)
+     (org-get-heading)
+     (org-insert-property-drawer)
+     (org-entry-put nil "oa_host" "seppal")
+     (org-entry-get nil "oa_hot")
+     (nth 4 (org-heading-components))
